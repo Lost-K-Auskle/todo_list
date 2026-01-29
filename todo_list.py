@@ -9,13 +9,6 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtCore import Qt, QSettings, QTimer, QUrl, QSize, QTime
 from PyQt6.QtGui import QAction, QFont, QColor, QPalette, QBrush, QPixmap, QMovie
 
-try:
-    from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-    from PyQt6.QtMultimediaWidgets import QVideoWidget
-    HAS_MULTIMEDIA = True
-except ImportError:
-    HAS_MULTIMEDIA = False
-
 # --- 计时器小组件 ---
 class TimerWidget(QWidget):
     def __init__(self, parent=None):
@@ -27,20 +20,17 @@ class TimerWidget(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 5, 0, 5)
         
-        # 1. 时间显示 (LCD风格或普通Label)
         self.time_display = QLabel("00:00:00")
         self.time_display.setFont(QFont("Consolas", 14, QFont.Weight.Bold))
         self.time_display.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.time_display.setFixedWidth(100)
         
-        # 2. 控制输入 (用于倒计时设置分钟)
         self.min_input = QSpinBox()
         self.min_input.setRange(0, 180)
         self.min_input.setSuffix(" 分")
         self.min_input.setToolTip("设置倒计时分钟数，0为正向计时")
         self.min_input.valueChanged.connect(self.reset_timer_mode)
         
-        # 3. 按钮
         self.btn_start = QPushButton("▶")
         self.btn_start.setFixedWidth(30)
         self.btn_start.clicked.connect(self.toggle_timer)
@@ -61,7 +51,6 @@ class TimerWidget(QWidget):
         self.timer.timeout.connect(self.update_timer)
 
     def reset_timer_mode(self):
-        """当输入框改变时，重置状态"""
         self.stop()
         mins = self.min_input.value()
         if mins > 0:
@@ -81,7 +70,7 @@ class TimerWidget(QWidget):
     def start(self):
         self.is_running = True
         self.btn_start.setText("⏸")
-        self.min_input.setEnabled(False) # 运行时禁止修改时间
+        self.min_input.setEnabled(False)
         self.timer.start(1000)
 
     def stop(self):
@@ -92,7 +81,7 @@ class TimerWidget(QWidget):
 
     def reset_timer(self):
         self.stop()
-        self.reset_timer_mode() # 恢复到输入框设定的数值
+        self.reset_timer_mode()
 
     def update_timer(self):
         if self.is_countdown:
@@ -112,12 +101,11 @@ class TimerWidget(QWidget):
         self.time_display.setText(f"{hrs:02}:{mins:02}:{secs:02}")
 
     def time_up_signal(self):
-        # 简单的完成提示
         parent = self.window()
         if isinstance(parent, QMainWindow):
             QMessageBox.information(parent, "计时结束", "专注时间结束！休息一下吧。")
 
-# --- 预览窗口 ---
+# --- 预览窗口 (Lite版：无视频) ---
 class PreviewWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -125,25 +113,14 @@ class PreviewWidget(QWidget):
         self.current_settings = {"mode": 0, "opacity": 1.0, "bg_path": "", "style": 0, "confirm": True}
         self.is_processing = True 
 
+        # GIF 层
         self.gif_label = QLabel(self)
         self.gif_label.setScaledContents(True)
         self.gif_label.resize(self.size())
         self.gif_label.hide()
         self.movie = None
 
-        self.video_widget = None
-        self.media_player = None
-        if HAS_MULTIMEDIA:
-            self.video_widget = QVideoWidget(self)
-            self.video_widget.resize(self.size())
-            self.video_widget.hide()
-            self.media_player = QMediaPlayer()
-            self.audio_output = QAudioOutput()
-            self.media_player.setAudioOutput(self.audio_output)
-            self.media_player.setVideoOutput(self.video_widget)
-            self.audio_output.setVolume(0)
-            self.media_player.mediaStatusChanged.connect(self.check_video_loop)
-
+        # UI层
         self.ui_container = QWidget(self)
         self.ui_container.setGeometry(0, 0, 220, 350)
         self.ui_container.setObjectName("preview_container")
@@ -177,10 +154,6 @@ class PreviewWidget(QWidget):
         self.fake_list.item(1).setCheckState(Qt.CheckState.Checked) 
         self.fake_list.item(2).setCheckState(Qt.CheckState.Unchecked)
         self.is_processing = False
-
-    def check_video_loop(self, status):
-        if status == QMediaPlayer.MediaStatus.EndOfMedia:
-            self.media_player.play()
 
     def add_task(self):
         text = self.input_fake.text().strip()
@@ -234,9 +207,6 @@ class PreviewWidget(QWidget):
         self.is_processing = True 
         self.current_settings = {"mode": mode, "opacity": opacity_val, "bg_path": bg_path, "style": completion_style, "confirm": confirm_bool}
 
-        if HAS_MULTIMEDIA:
-            self.media_player.stop()
-            self.video_widget.hide()
         if self.movie: self.movie.stop()
         self.gif_label.hide()
         self.ui_container.setStyleSheet("") 
@@ -261,11 +231,6 @@ class PreviewWidget(QWidget):
                 self.movie.start()
                 self.gif_label.show()
                 self.gif_label.lower()
-            elif ext in ['.mp4', '.avi', '.mkv'] and HAS_MULTIMEDIA:
-                self.video_widget.show()
-                self.video_widget.lower()
-                self.media_player.setSource(QUrl.fromLocalFile(bg_path))
-                self.media_player.play()
             elif ext in ['.jpg', '.png', '.jpeg']:
                 path = bg_path.replace('\\', '/')
                 self.ui_container.setStyleSheet(f"QWidget#preview_container {{ border-image: url(\"{path}\") 0 0 0 0 stretch stretch; }}")
@@ -311,19 +276,16 @@ class SettingsDialog(QDialog):
         left_panel = QWidget()
         form_layout = QFormLayout(left_panel)
         
-        # 1. 基础功能
         self.confirm_delete_cb = QCheckBox("删除/完成需确认")
         self.confirm_delete_cb.setChecked(self.data["confirm_delete"])
         self.confirm_delete_cb.stateChanged.connect(self.trigger_preview)
         
-        # 2. 增强功能 (时间与计时器)
         self.show_clock_cb = QCheckBox("显示当前时间 (顶部)")
         self.show_clock_cb.setChecked(self.data.get("show_clock", False))
         
         self.enable_timer_cb = QCheckBox("启用计时器/倒计时")
         self.enable_timer_cb.setChecked(self.data.get("enable_timer", False))
 
-        # 3. 样式
         self.style_combo = QComboBox()
         self.style_combo.addItems(["样式 1: 直接移除", "样式 2: 划线保留"])
         self.style_combo.setCurrentIndex(self.data["completion_style"])
@@ -393,7 +355,8 @@ class SettingsDialog(QDialog):
         self.trigger_preview()
 
     def browse_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "选择背景", "", "Media (*.png *.jpg *.gif *.mp4 *.avi);;All (*)")
+        # 移除视频格式支持，只保留图片和GIF
+        path, _ = QFileDialog.getOpenFileName(self, "选择背景", "", "Images (*.png *.jpg *.jpeg *.gif);;All (*)")
         if path: self.path_edit.setText(path)
 
     def trigger_preview(self):
@@ -415,7 +378,7 @@ class SettingsDialog(QDialog):
             "enable_timer": self.enable_timer_cb.isChecked()
         }
 
-# --- 主程序 ---
+# --- 主程序 (Lite版) ---
 class TodoListApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -425,32 +388,22 @@ class TodoListApp(QMainWindow):
         self.redo_stack = []
         self.current_snapshot = []
 
-        self.settings = QSettings("MyPersonalTools", "SimpleTodoList_v8")
+        self.settings = QSettings("MyPersonalTools", "SimpleTodoList_Lite")
         self.theme_mode = min(self.settings.value("theme_mode", 0, type=int), 2)
         self.bg_path = self.settings.value("bg_path", "", type=str)
         self.need_confirm_delete = self.settings.value("confirm_delete", True, type=bool)
         self.completion_style = self.settings.value("completion_style", 0, type=int) 
         self.window_opacity = self.settings.value("opacity", 0.95, type=float)
-        # 新增配置
         self.show_clock = self.settings.value("show_clock", False, type=bool)
         self.enable_timer = self.settings.value("enable_timer", False, type=bool)
 
         self.movie = None
-        self.media_player = None
-        self.video_widget = None
-        if HAS_MULTIMEDIA:
-            self.media_player = QMediaPlayer()
-            self.audio_output = QAudioOutput()
-            self.media_player.setAudioOutput(self.audio_output)
-            self.audio_output.setVolume(0)
-            self.media_player.mediaStatusChanged.connect(self.check_video_loop)
 
         self.setWindowTitle("我的 To-Do List")
         self.resize(400, 600)
         self.init_ui()
         self.init_tray()
         
-        # 启动时钟定时器
         self.clock_timer = QTimer(self)
         self.clock_timer.timeout.connect(self.update_clock)
         self.clock_timer.start(1000)
@@ -468,15 +421,9 @@ class TodoListApp(QMainWindow):
         self.gif_bg_label.setScaledContents(True)
         self.gif_bg_label.hide()
 
-        if HAS_MULTIMEDIA:
-            self.video_widget = QVideoWidget(self.central_widget)
-            self.video_widget.hide()
-            self.media_player.setVideoOutput(self.video_widget)
-
         self.main_layout = QVBoxLayout()
         self.central_widget.setLayout(self.main_layout)
 
-        # 顶部工具栏
         top_bar = QHBoxLayout()
         settings_btn = QPushButton("⚙️")
         settings_btn.setFixedWidth(30)
@@ -488,10 +435,9 @@ class TodoListApp(QMainWindow):
         self.btn_redo.setFixedWidth(30)
         self.btn_redo.clicked.connect(self.redo_action)
         
-        # 时钟 Label
         self.clock_label = QLabel("--:--:--")
         self.clock_label.setStyleSheet("font-weight: bold; margin-right: 10px;")
-        self.clock_label.hide() # 默认隐藏，根据设置显示
+        self.clock_label.hide()
 
         self.always_on_top_cb = QCheckBox("置顶")
         self.always_on_top_cb.stateChanged.connect(self.toggle_always_on_top)
@@ -500,16 +446,14 @@ class TodoListApp(QMainWindow):
         top_bar.addWidget(self.btn_undo)
         top_bar.addWidget(self.btn_redo)
         top_bar.addStretch() 
-        top_bar.addWidget(self.clock_label) # 时钟放在置顶开关左侧
+        top_bar.addWidget(self.clock_label)
         top_bar.addWidget(self.always_on_top_cb)
         self.main_layout.addLayout(top_bar)
 
-        # 计时器 Widget
         self.timer_widget = TimerWidget(self)
-        self.timer_widget.hide() # 默认隐藏
+        self.timer_widget.hide()
         self.main_layout.addWidget(self.timer_widget)
 
-        # 列表
         self.task_list = QListWidget()
         self.task_list.itemDoubleClicked.connect(self.on_item_double_clicked)
         self.task_list.itemChanged.connect(self.on_item_check_state_changed)
@@ -517,7 +461,6 @@ class TodoListApp(QMainWindow):
         self.task_list.model().rowsMoved.connect(self.on_rows_moved)
         self.main_layout.addWidget(self.task_list)
 
-        # 底部输入
         input_layout = QHBoxLayout()
         self.input_field = QLineEdit()
         self.input_field.setPlaceholderText("输入任务...")
@@ -532,7 +475,6 @@ class TodoListApp(QMainWindow):
         if self.show_clock:
             self.clock_label.setText(QTime.currentTime().toString("HH:mm:ss"))
 
-    # --- 逻辑与其他方法 ---
     def on_rows_moved(self, parent, start, end, destination, row):
         self.commit_action()
         self.update_snapshot_after_action()
@@ -648,17 +590,10 @@ class TodoListApp(QMainWindow):
             self.set_item_style(item, item.checkState() == Qt.CheckState.Checked)
 
     def resizeEvent(self, event):
-        if self.video_widget:
-            self.video_widget.resize(self.size())
-            self.video_widget.lower()
         if self.gif_bg_label:
             self.gif_bg_label.resize(self.size())
             self.gif_bg_label.lower()
         super().resizeEvent(event)
-
-    def check_video_loop(self, status):
-        if status == QMediaPlayer.MediaStatus.EndOfMedia:
-            self.media_player.play()
 
     def init_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
@@ -706,28 +641,21 @@ class TodoListApp(QMainWindow):
         self.setWindowOpacity(self.window_opacity)
         self.central_widget.setStyleSheet("")
         
-        # 重置媒体
-        if HAS_MULTIMEDIA: self.media_player.stop(); self.video_widget.hide()
         if self.movie: self.movie.stop()
         self.gif_bg_label.hide()
 
-        # 功能开关
         self.clock_label.setVisible(self.show_clock)
         self.timer_widget.setVisible(self.enable_timer)
 
-        # 样式定义
         list_style = "border: none; background-color: rgba(255,255,255,150); border-radius: 5px;"
         input_style = "border: 1px solid #ccc; background-color: rgba(255,255,255,180); border-radius: 3px;"
         
-        # 弹窗与CheckBox通用暗色样式
         dark_popup = """
             QMessageBox { background-color: #2b2b2b; color: white; }
             QMessageBox QLabel { color: white; }
             QMessageBox QPushButton { background-color: #444; color: white; border: 1px solid #555; padding: 5px; }
         """
-        light_popup = "" # 使用默认
 
-        # 适配 CheckBox 样式 (钩子与框)
         def get_checkbox_style(is_dark):
             border = "#999" if not is_dark else "#aaa"
             bg = "white" if not is_dark else "#444"
@@ -736,10 +664,9 @@ class TodoListApp(QMainWindow):
                 QCheckBox {{ spacing: 5px; color: {tick}; }}
                 QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {border}; background: {bg}; border-radius: 3px; }}
                 QCheckBox::indicator:checked {{ background-color: #0078d7; border-color: #0078d7; image: url(none); }} 
-                /* 这里可以用图片替换，为简单起见，checked变蓝 */
             """
 
-        if self.theme_mode == 0: # Light
+        if self.theme_mode == 0: 
             style = f"""
                 QMainWindow {{ background-color: #f0f0f0; }}
                 QListWidget {{ {list_style} background-color: rgba(255,255,255,200); }}
@@ -749,7 +676,7 @@ class TodoListApp(QMainWindow):
             """
             self.setStyleSheet(style)
             
-        elif self.theme_mode == 1: # Dark
+        elif self.theme_mode == 1:
             style = f"""
                 QMainWindow {{ background-color: #2b2b2b; }}
                 QListWidget {{ background-color: rgba(50,50,50,200); color: white; border: 1px solid #555; }}
@@ -761,7 +688,7 @@ class TodoListApp(QMainWindow):
             """
             self.setStyleSheet(style)
             
-        elif self.theme_mode == 2: # Custom
+        elif self.theme_mode == 2:
             style = f"""
                 QMainWindow {{ background-color: #f0f0f0; }}
                 QListWidget {{ {list_style} }}
@@ -772,7 +699,6 @@ class TodoListApp(QMainWindow):
             """
             self.setStyleSheet(style)
             
-            # 背景处理
             ext = os.path.splitext(self.bg_path)[1].lower()
             if ext == '.gif':
                 self.movie = QMovie(self.bg_path)
@@ -781,12 +707,6 @@ class TodoListApp(QMainWindow):
                 self.gif_bg_label.resize(self.size())
                 self.gif_bg_label.show()
                 self.gif_bg_label.lower()
-            elif ext in ['.mp4', '.avi', '.mkv'] and HAS_MULTIMEDIA:
-                self.video_widget.resize(self.size())
-                self.video_widget.show()
-                self.video_widget.lower()
-                self.media_player.setSource(QUrl.fromLocalFile(self.bg_path))
-                self.media_player.play()
             elif ext in ['.jpg', '.png', '.jpeg']:
                 path = self.bg_path.replace('\\', '/')
                 self.central_widget.setStyleSheet(self.central_widget.styleSheet() + f"QWidget#central_widget {{ border-image: url(\"{path}\") 0 0 0 0 stretch stretch; }}")
@@ -797,7 +717,6 @@ class TodoListApp(QMainWindow):
         self.show()
 
     def closeEvent(self, event):
-        # 弹窗也要适配主题
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("关闭")
         msg_box.setText("选择关闭方式")

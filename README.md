@@ -83,14 +83,7 @@ python todo_list.py
   - 暗黑模式
   - 自定义背景
 - **不透明度**: 调整窗口透明度
-- **背景文件**: 选择自定义背景（支持图片、GIF、视频）
-
-## 配置文件
-
-应用使用 QSettings 保存配置，配置存储在系统默认位置：
-- Windows: `HKEY_CURRENT_USER\Software\MyPersonalTools\SimpleTodoList_v8`
-- macOS: `~/Library/Preferences/com.MyPersonalTools.SimpleTodoList_v8.plist`
-- Linux: `~/.config/MyPersonalTools/SimpleTodoList_v8.conf`
+- **背景文件**: 选择自定义背景（支持图片、GIF）
 
 ## 快捷键
 
@@ -107,7 +100,7 @@ python todo_list.py
 
 ## 注意事项
 
-1. 视频背景需要安装 `PyQt6-Multimedia`
+1. 自定义背景文件路径仅支持本地文件路径
 2. 倒计时最大支持180分钟
 3. 自定义背景文件路径会在下次启动时自动加载
 4. 任务数据仅保存在内存中，关闭应用后会清空
@@ -119,7 +112,7 @@ python todo_list.py
 
 ## 更新日志
 
-### v1.0
+### v1.0.0-beta
 - 初始版本发布
 - 基础任务管理功能
 - 多主题支持
